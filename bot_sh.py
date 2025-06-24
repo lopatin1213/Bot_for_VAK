@@ -11,8 +11,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # Админ-ключи и токены
-ADMIN_KEY = 'Админ'
-TOKEN = 'токен'
+ADMIN_KEY = 'Админ-Ключ '
+TOKEN = 'Токен'
 
 # Чат и топик, куда будут отправляться отчеты
 CHAT_ID = '-1002779450871'
@@ -23,128 +23,178 @@ DATA_FILE = 'balances.json'
 
 # Загрузка данных из файла при старте бота
 try:
-    with open(DATA_FILE, 'r') as file:
-        balances = json.load(file)
+	with open(DATA_FILE, 'r') as file:
+		balances = json.load(file)
 except FileNotFoundError:
-    balances = {}
+	balances = {}
+
 
 # Функция для сохранения данных в файл
 def save_data():
-    with open(DATA_FILE, 'w') as file:
-        json.dump(balances, file)
+	with open(DATA_FILE, 'w') as file:
+		json.dump(balances, file)
+
 
 # Проверка администратора
 def check_admin(update):
-    admin_key = update.message.text.split()[1].strip() if len(update.message.text.split()) > 1 else ''
-    return admin_key == ADMIN_KEY
+	admin_key = update.message.text.split()[1].strip() if len(update.message.text.split()) > 1 else ''
+	return admin_key == ADMIN_KEY
+
 
 # Команда установки начального баланса пользователя
 async def set_initial_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not check_admin(update):
-        await update.message.reply_text("Доступ запрещён.")
-        return
+	if not check_admin(update):
+		await update.message.reply_text("Доступ запрещён.")
+		return
 
-    args = context.args
-    if len(args) != 4 or not args[2].isdigit() or not args[3].isdigit():
-        await update.message.reply_text("Ошибка: неверный формат аргументов. Используйте /set_balance USERNAME ДОЛЛАРЫ CR")
-        return
+	args = context.args
+	if len(args) != 4 or not args[2].isdigit() or not args[3].isdigit():
+		await update.message.reply_text(
+			"Ошибка: неверный формат аргументов. Используйте /set_balance USERNAME ДОЛЛАРЫ CR")
+		return
 
-    username = args[1].strip().lower()
-    initial_dollars = int(args[2])
-    initial_cr = int(args[3])
+	username = args[1].strip().lower()
+	initial_dollars = int(args[2])
+	initial_cr = int(args[3])
 
-    balances[username] = {
-        'name': '@' + username,
-        'dollars': initial_dollars,
-        'cr_units': initial_cr
-    }
+	balances[username] = {
+		'name': '@' + username,
+		'dollars': initial_dollars,
+		'cr_units': initial_cr
+	}
 
-    # Сохранение данных
-    save_data()
+	# Сохранение данных
+	save_data()
 
-    await update.message.reply_text(f"Установлен начальный баланс для '{args[1]}': ${initial_dollars}, CR: {initial_cr}.")
+	await update.message.reply_text(
+		f"Установлен начальный баланс для '{args[1]}': ${initial_dollars}, CR: {initial_cr}.")
+
 
 # Генерация отчета по балансу
 def generate_report():
-    report = ['Итоговый список изменений и текущий баланс участников:']
-    for user in sorted(balances.keys()):
-        data = balances[user]
-        balance_dollars = data['dollars']
-        balance_cr = data['cr_units']
+	report = ['Итоговый список изменений и текущий баланс участников:']
+	for user in sorted(balances.keys()):
+		data = balances[user]
+		balance_dollars = data['dollars']
+		balance_cr = data['cr_units']
 
-        line = (
-            f"{data['name']}: "
-            f"- $: {balance_dollars}$ "
-            f"- CR: {balance_cr}CR"
-        )
-        report.append(line)
-    return "\n".join(report)
+		line = (
+			f"{data['name']}: "
+			f"- $: {balance_dollars}$ "
+			f"- CR: {balance_cr}CR"
+		)
+		report.append(line)
+	return "\n".join(report)
+
 
 # Задача отправки ежедневного отчета в указанный чат и тему
 async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
-    report = generate_report()
-    await context.bot.send_message(chat_id=CHAT_ID, text=report, message_thread_id=TOPIC_ID)
+	report = generate_report()
+	await context.bot.send_message(chat_id=CHAT_ID, text=report, message_thread_id=TOPIC_ID)
+	await context.bot.send_message(chat_id='-1002671216310', text=report, message_thread_id=4)
+
 
 # Основная логика обработки сообщений
 async def process_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message is None:
-        print("update.message is None Why?")
-        return
-    chat_id = update.message.chat_id
-    msg = update.message.text.strip()
+	if update.message is None:
+		print("update.message is None Why?")
+		return
+	chat_id = update.message.chat_id
+	msg = update.message.text.strip()
 
-    # Регулярное выражение для парсинга суммы долларов
-    pattern = r'^@(\w+)\s*([+-]?\d+)\$'
-    result = re.search(pattern, msg)
+	# Регулярное выражение для парсинга суммы долларов
+	pattern = r'^@(\w+)\s*([+-]?\d+)\$'
+	result = re.search(pattern, msg)
 
-    if result is None:
-        # Регулярное выражение для парсинга единиц CR
-        pattern = r'^@(\w+)\s*([+-]?\d+)\#'
-        result = re.search(pattern, msg)
-        if result is None:
-            print('Подходящих сообщений нет.')
-            return
-        else:
-            username = result.group(1).strip().lower()
-            cr_change = int(result.group(2))
+	if result is None:
+		# Регулярное выражение для парсинга единиц CR
+		pattern = r'^@(\w+)\s*([+-]?\d+)\#'
+		result = re.search(pattern, msg)
+		if result is None:
+			print('Подходящих сообщений нет.')
+			return
+		else:
+			username = result.group(1).strip().lower()
+			cr_change = int(result.group(2))
+			print(username, cr_change)
+			# Обновление баланса пользователя
+			balances.setdefault(username, {'name': '@' + username, 'dollars': 0, 'cr_units': 0})
+			balances[username]['cr_units'] += cr_change
 
-            # Обновление баланса пользователя
-            balances.setdefault(username, {'name': '@' + username, 'dollars': 0, 'cr_units': 0})
-            balances[username]['cr_units'] += cr_change
+			# Сохранение данных
+			save_data()
 
-            # Сохранение данных
-            save_data()
+			await update.message.reply_text("Изменение принято.")
+			return
 
-            await update.message.reply_text("Изменение принято.")
-            return
+	username = result.group(1).strip().lower()
+	dollars_change = int(result.group(2))
+	print(username, dollars_change)
+	# Обновление баланса пользователя
+	balances.setdefault(username, {'name': '@' + username, 'dollars': 0, 'cr_units': 0})
+	balances[username]['dollars'] += dollars_change
 
-    username = result.group(1).strip().lower()
-    dollars_change = int(result.group(2))
+	# Сохранение данных
+	save_data()
 
-    # Обновление баланса пользователя
-    balances.setdefault(username, {'name': '@' + username, 'dollars': 0, 'cr_units': 0})
-    balances[username]['dollars'] += dollars_change
+	await update.message.reply_text("Изменение принято.")
 
-    # Сохранение данных
-    save_data()
 
-    await update.message.reply_text("Изменение принято.")
+async def delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+	args = context.args
+	if len(args) != 1:
+		await update.message.reply_text("Ошибка: неверный формат аргументов. Используйте /delete USERNAME")
+		return
+
+	username = args[0].strip().lower()
+
+	if username in balances:
+		del balances[username]
+		save_data()  # Сохраняем изменения в файле
+		await update.message.reply_text(f"Пользователь {username} удален из списка.")
+	else:
+		await update.message.reply_text(f"Пользователь {username} не найден в списке.")
+
+
+async def add_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+	args = context.args
+	if len(args) != 1:
+		await update.message.reply_text("Ошибка: неверный формат аргументов. Используйте /add USERNAME")
+		return
+
+	username = args[0].strip().lower()
+	initial_dollars = 0
+	initial_cr = 0
+
+	balances[username] = {
+		'name': '@' + username,
+		'dollars': initial_dollars,
+		'cr_units': initial_cr
+	}
+
+	save_data()  # Сохраняем изменения в файле
+	await update.message.reply_text(f"Пользователь {username} зарегистрирован.")
+
 
 # Запуск бота
 def main():
-    application = ApplicationBuilder().token(TOKEN).build()
+	application = ApplicationBuilder().token(TOKEN).build()
 
-    # Регистрация обработчиков команд и сообщений
-    application.add_handler(CommandHandler('set_balance', set_initial_balance))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_message))
+	# Регистрация обработчиков команд и сообщений
+	application.add_handler(CommandHandler('delete', delete_user))  # Новая команда для удаления пользователя
+	application.add_handler(CommandHandler('add', add_user))
 
-    # Использование встроенного планировщика для ежедневного отчета
-    job_queue = application.job_queue
-    job_queue.run_daily(send_daily_report, time=datetime.time(hour=21, minute=0, second=0, microsecond=0, tzinfo=datetime.timezone.utc))
-    logger.info("Бот запущен!")
-    # Начало опроса сообщений
-    application.run_polling()
+	application.add_handler(CommandHandler('set_balance', set_initial_balance))
+	application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_message))
+
+	# Использование встроенного планировщика для ежедневного отчета
+	job_queue = application.job_queue
+	job_queue.run_daily(send_daily_report,
+	                    time=datetime.time(hour=21, minute=0, second=0, microsecond=0, tzinfo=datetime.timezone.utc))
+	logger.info("Бот запущен!")
+	# Начало опроса сообщений
+	application.run_polling()
 
 
 if __name__ == "__main__":
-    main()
+	main()
